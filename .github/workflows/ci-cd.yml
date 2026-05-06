@@ -40,13 +40,13 @@ jobs:
       # ── 5. Déploiement sur k3s ────────────────────────────────────────
       - name: Deploy to k3s
         run: |
-          kubectl apply -f k8s/mysql-secret.yaml
-          kubectl apply -f k8s/mysql-pvc.yaml
-          kubectl apply -f k8s/mysql-deployment.yaml
-          kubectl apply -f k8s/mysql-service.yaml
-          kubectl apply -f k8s/api-deployment.yaml
-          kubectl apply -f k8s/api-service.yaml
-          kubectl apply -f k8s/api-hpa.yaml
+          kubectl apply -f k8S/mysql-secret.yaml
+          kubectl apply -f k8S/mysql-pvc.yaml
+          kubectl apply -f k8S/mysql-deployment.yaml
+          kubectl apply -f k8S/mysql-service.yaml
+          kubectl apply -f k8S/api-deployment.yaml
+          kubectl apply -f k8S/api-service.yaml
+          kubectl apply -f k8S/api-hpa.yaml
 
       # ── 6. Vérifier que les pods tournent ─────────────────────────────
       - name: Check deployment status
