@@ -1,0 +1,55 @@
+name: CI/CD Pipeline - TP DevOps JUNIA
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+
+    steps:
+
+      # ── 1. Récupérer le code ──────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Configurer l'infrastructure (Ansible) ──────────────────────
+      - name: Configure infrastructure
+        run: |
+          ansible-playbook -i ansible/inventory.ini ansible/playbook-infra.yml
+
+      # ── 3. Build de l'image Docker ────────────────────────────────────
+      - name: Build Docker image
+        run: |
+          docker build -t robo2575/node-api:latest .
+          docker tag robo2575/node-api:latest robo2575/node-api:${{ github.sha }}
+
+      # ── 4. Push sur Docker Hub ────────────────────────────────────────
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
+            -u "${{ secrets.DOCKERHUB_USERNAME }}" \
+            --password-stdin
+
+      - name: Push Docker image
+        run: |
+          docker push robo2575/node-api:latest
+          docker push robo2575/node-api:${{ github.sha }}
+
+      # ── 5. Déploiement sur k3s ────────────────────────────────────────
+      - name: Deploy to k3s
+        run: |
+          kubectl apply -f k8s/mysql-secret.yaml
+          kubectl apply -f k8s/mysql-pvc.yaml
+          kubectl apply -f k8s/mysql-deployment.yaml
+          kubectl apply -f k8s/mysql-service.yaml
+          kubectl apply -f k8s/api-deployment.yaml
+          kubectl apply -f k8s/api-service.yaml
+          kubectl apply -f k8s/api-hpa.yaml
+
+      # ── 6. Vérifier que les pods tournent ─────────────────────────────
+      - name: Check deployment status
+        run: |
+          kubectl rollout status deployment/node-api --timeout=120s
+          kubectl get pods
