@@ -1,100 +1,99 @@
-<div id="top"></div>
+# TP DevOps Final — JUNIA CIR3
 
-<h1 align="center">Node.js Express REST API MySQL JS Example</h1>
+## Partie 4 — CI/CD Pipeline
 
-<div align="center">
-  <p align="center">
-    This REST API example is a basic backend application to test basic API functions with MySQL database.
-  </p>
-  <a href="https://www.postman.com/workspace/node-js-express-mysql-rest-api-example/overview">View Postman Files</a>
-</div>
+### Prérequis
 
-<!-- TABLE OF CONTENTS -->
-<details>
-  <summary>Table of Contents</summary>
-  <ol>
-    <li>
-      <a href="#about-the-application">About The Application</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
-    </li>
-    <li><a href="#how-to-install">How To Install</a></li>
-    <li><a href="#available-scripts">Available Scripts</a></li>
-    <li><a href="#postman">Postman</a></li>
-  </ol>
-</details>
+- Un runner self-hosted installé sur la VM Debian (voir ci-dessous)
+- Les secrets GitHub configurés dans le repo
+- Docker installé sur la VM
+- `kubectl` configuré pour accéder au cluster k3s
 
-<!-- ABOUT THE APPLICATION -->
+---
 
-## About The Application
+### Secrets GitHub à configurer
 
-This REST API example is a basic backend application to test basic API functions with MySQL database.
+Dans le repo GitHub : **Settings → Secrets and variables → Actions → New repository secret**
 
-It is built with Node.js and Express Framework with Javascript. In addition, the applications database is MySQL, with the use of mysql2 library.
+| Nom du secret | Valeur |
+|---|---|
+| `DOCKERHUB_USERNAME` | `robo2575` |
+| `DOCKERHUB_TOKEN` | Token d'accès Docker Hub |
 
-In the applicaiton we can manage user data, such as create/edit/delete a user. In addition, we can get all the users in the database.
+---
 
-The point of this backend application is to test CRUD operations with MySQL database.
+### Installation du runner self-hosted
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+Se connecter à la VM Debian en SSH, puis :
 
-### Built With
+```bash
+mkdir -p ~/actions-runner && cd ~/actions-runner
 
--   [Node.js](https://nodejs.org/en/)
--   [Express](https://expressjs.com/)
--   [Cors](https://www.npmjs.com/package/cors)
--   [MySQL2](https://www.npmjs.com/package/mysql2)
+# Télécharger le runner (version depuis GitHub Settings > Actions > Runners)
+curl -o actions-runner-linux-x64.tar.gz -L \
+  https://github.com/actions/runner/releases/download/v2.316.0/actions-runner-linux-x64-2.316.0.tar.gz
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+tar xzf ./actions-runner-linux-x64.tar.gz
 
-<!-- INSTALLATION INSTRUCTIONS -->
+# Configurer avec le token depuis GitHub
+./config.sh --url https://github.com/TON_ORG/tp-devops-junia --token TON_TOKEN
 
-## How To Install
+# Installer comme service systemd (tourne en permanence)
+sudo ./svc.sh install
+sudo ./svc.sh start
 
-**Git clone**
-
-```
-git clone https://github.com/almoggutin/Node-Express-REST-API-MySQL-JS-Example
+# Vérifier
+sudo ./svc.sh status
 ```
 
-**Instructions**
+---
 
--   After cloning the the repository run `npm i` in order to install all the dependencies.
--   Create an env file in the root of the project named .env and fill in the follwing variables: PORT, DB_HOST, DB_PORT, DB_USERNAME, DB_USERNAME_PASSWORD, DB_NAME.
--   In the sql directory, there are sql files that you will need to execute in order to initialize the database.
+### Structure des fichiers
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+```
+.github/
+  workflows/
+    ci-cd.yml         ← Pipeline principale (partie 4)
+k8S/
+  mysql-secret.yaml
+  mysql-pvc.yaml
+  mysql-deployment.yaml
+  mysql-service.yaml
+  api-deployment.yaml
+  api-service.yaml
+  api-hpa.yaml
+ansible/
+  inventory.ini
+  playbook-infra.yml
+Dockerfile
+README.md
+```
 
-<!--  AVAILABLE SCRIPTS -->
+---
 
-## Available Scripts
+### Fonctionnement de la pipeline
 
-In the project directory, you can run:
+La pipeline se déclenche automatiquement à chaque push sur la branche `main`.
 
-### `npm start`
+Elle exécute les étapes suivantes dans l'ordre :
 
-Runs the app in the production mode.\
-However, this script is only meant to be run when deploying the application. The application is built, where you need to setup the env variables on the machine that you will be hosting it on or on a web hosting service, unlike in development mode.
+1. **Checkout** — récupère le code du repo
+2. **Configure infrastructure** — lance le playbook Ansible pour préparer la VM
+3. **Build** — construit l'image Docker `robo2575/node-api`
+4. **Push** — pousse l'image sur Docker Hub (tag `latest` + tag du commit)
+5. **Deploy** — applique tous les manifests Kubernetes sur le cluster k3s
+6. **Check** — vérifie que les pods sont bien démarrés
 
-### `npm run dev`
+---
 
-Runs the app in the development mode.\
-Open localhost on the port you decided on in the env variables to view it in the browser.
+### Lancer la pipeline manuellement
 
-The API will reload if you make edits with the use of nodemon.
+Faire un commit et push sur `main` :
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+```bash
+git add .
+git commit -m "trigger pipeline"
+git push origin main
+```
 
-<!-- POSTMAN -->
-
-## Postman
-
-If you would like to run the files locally on your machine in the postman desktop application, included in the repository, in the `postman` directory all the files so you can import them. In addition you will have to configure env variables in postman so that you will be able to test properly everything.
-
-<div align="center">
-  <img src="./assets/postman/postman-global-env-variables.png" alt="Postman global env variables."/>
-  <img src="./assets/postman/postman-jobs-env-variables.png" alt="Postman admin env variables."/>
-</div>
-
-<p align="right">(<a href="#top">back to top</a>)</p>
+Ensuite suivre l'exécution dans l'onglet **Actions** du repo GitHub.
