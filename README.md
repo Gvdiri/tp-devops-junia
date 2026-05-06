@@ -1,99 +1,62 @@
-# TP DevOps Final — JUNIA CIR3
+name: CI/CD Pipeline - TP DevOps JUNIA
 
-## Partie 4 — CI/CD Pipeline
+on:
+  push:
+    branches: [ main ]
 
-### Prérequis
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
 
-- Un runner self-hosted installé sur la VM Debian (voir ci-dessous)
-- Les secrets GitHub configurés dans le repo
-- Docker installé sur la VM
-- `kubectl` configuré pour accéder au cluster k3s
+    steps:
 
----
+      # ── 1. Récupérer le code ──────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-### Secrets GitHub à configurer
+      # ── 2. Configurer l'infrastructure (Terraform) ────────────────────
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
-Dans le repo GitHub : **Settings → Secrets and variables → Actions → New repository secret**
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
 
-| Nom du secret | Valeur |
-|---|---|
-| `DOCKERHUB_USERNAME` | `robo2575` |
-| `DOCKERHUB_TOKEN` | Token d'accès Docker Hub |
+      - name: Terraform Apply
+        working-directory: ./terraform
+        run: terraform apply -auto-approve
 
----
+      # ── 3. Build de l'image Docker ────────────────────────────────────
+      - name: Build Docker image
+        run: |
+          docker build -t robo2575/node-api:latest .
+          docker tag robo2575/node-api:latest robo2575/node-api:${{ github.sha }}
 
-### Installation du runner self-hosted
+      # ── 4. Push sur Docker Hub ────────────────────────────────────────
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
+            -u "${{ secrets.DOCKERHUB_USERNAME }}" \
+            --password-stdin
 
-Se connecter à la VM Debian en SSH, puis :
+      - name: Push Docker image
+        run: |
+          docker push robo2575/node-api:latest
+          docker push robo2575/node-api:${{ github.sha }}
 
-```bash
-mkdir -p ~/actions-runner && cd ~/actions-runner
+      # ── 5. Déploiement sur k3s ────────────────────────────────────────
+      - name: Deploy to k3s
+        run: |
+          kubectl apply -f k8S/mysql-secret.yaml
+          kubectl apply -f k8S/mysql-pvc.yaml
+          kubectl apply -f k8S/mysql-deployment.yaml
+          kubectl apply -f k8S/mysql-service.yaml
+          kubectl apply -f k8S/api-deployment.yaml
+          kubectl apply -f k8S/api-service.yaml
+          kubectl apply -f k8S/api-hpa.yaml
 
-# Télécharger le runner (version depuis GitHub Settings > Actions > Runners)
-curl -o actions-runner-linux-x64.tar.gz -L \
-  https://github.com/actions/runner/releases/download/v2.316.0/actions-runner-linux-x64-2.316.0.tar.gz
-
-tar xzf ./actions-runner-linux-x64.tar.gz
-
-# Configurer avec le token depuis GitHub
-./config.sh --url https://github.com/TON_ORG/tp-devops-junia --token TON_TOKEN
-
-# Installer comme service systemd (tourne en permanence)
-sudo ./svc.sh install
-sudo ./svc.sh start
-
-# Vérifier
-sudo ./svc.sh status
-```
-
----
-
-### Structure des fichiers
-
-```
-.github/
-  workflows/
-    ci-cd.yml         ← Pipeline principale (partie 4)
-k8S/
-  mysql-secret.yaml
-  mysql-pvc.yaml
-  mysql-deployment.yaml
-  mysql-service.yaml
-  api-deployment.yaml
-  api-service.yaml
-  api-hpa.yaml
-ansible/
-  inventory.ini
-  playbook-infra.yml
-Dockerfile
-README.md
-```
-
----
-
-### Fonctionnement de la pipeline
-
-La pipeline se déclenche automatiquement à chaque push sur la branche `main`.
-
-Elle exécute les étapes suivantes dans l'ordre :
-
-1. **Checkout** — récupère le code du repo
-2. **Configure infrastructure** — lance le playbook Ansible pour préparer la VM
-3. **Build** — construit l'image Docker `robo2575/node-api`
-4. **Push** — pousse l'image sur Docker Hub (tag `latest` + tag du commit)
-5. **Deploy** — applique tous les manifests Kubernetes sur le cluster k3s
-6. **Check** — vérifie que les pods sont bien démarrés
-
----
-
-### Lancer la pipeline manuellement
-
-Faire un commit et push sur `main` :
-
-```bash
-git add .
-git commit -m "trigger pipeline"
-git push origin main
-```
-
-Ensuite suivre l'exécution dans l'onglet **Actions** du repo GitHub.
+      # ── 6. Vérifier que les pods tournent ─────────────────────────────
+      - name: Check deployment status
+        run: |
+          kubectl rollout status deployment/node-api --timeout=120s
+          kubectl get pods
