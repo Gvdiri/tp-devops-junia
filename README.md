@@ -56,6 +56,19 @@ docker pull robo2575/node-api:latest
 
 L'API et MySQL sont déployés sur k3s. L'API est accessible uniquement depuis l'intérieur du cluster (ClusterIP). Le HPA gère l'autoscaling entre 1 et 3 pods selon la charge CPU/mémoire.
 
+pour initialiser la BDD
+
+```bash
+kubectl exec -it deployment/mysql -- mysql -u root -prootpassword my_db -e "
+CREATE TABLE IF NOT EXISTS users (
+  id varchar(36) NOT NULL,
+  first_name varchar(255) NOT NULL,
+  last_name varchar(255) NOT NULL,
+  age int(11) NOT NULL,
+  PRIMARY KEY (id)
+);"
+```
+
 ```bash
 kubectl apply -f k8S/
 ```
