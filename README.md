@@ -61,6 +61,7 @@ L'API et MySQL sont déployés sur k3s. L'API est accessible uniquement depuis l
 pour initialiser la BDD
 
 ```bash
+#Manuellement
 kubectl exec -it deployment/mysql -- mysql -u root -prootpassword my_db -e "
 CREATE TABLE IF NOT EXISTS users (
   id varchar(36) NOT NULL,
@@ -69,6 +70,44 @@ CREATE TABLE IF NOT EXISTS users (
   age int(11) NOT NULL,
   PRIMARY KEY (id)
 );"
+
+#Automatiquement :
+apiVersion: v1
+kind: ConfigMap #Stock les infos non-sensibles (celles sensibles sont dans secret.yaml)
+metadata:
+  name: mysql-initdb  #Nom du ConfigMap, référencé dans le deployment MySQL
+  namespace: tpfin
+
+data:
+    #Dans un premier temps, elle crée la BDD si elle n'existe pas encore
+      #L'encodage supporte tous les caractères (émojis inclus)
+      #Règles de comparaison des caractères
+
+    #Selectionne la BDD qu'on vient de créer
+
+    #Crée la table users si elle n'existe pas encore
+      #Nom utilisateur (36 caractères max)
+      #Prénom (255 caractères max)
+      #Nom (255 caractères max)
+      #Age (un entier)
+      #La clé primaire
+      #Moteur de stockage MySQL qui garantit qu'une op soit complètement effectuée/annulée
+
+  init_database.sql: |
+    CREATE DATABASE IF NOT EXISTS `my_db`
+      DEFAULT CHARACTER SET utf8mb4
+      COLLATE utf8mb4_unicode_ci;
+
+    USE `my_db`;
+
+    CREATE TABLE IF NOT EXISTS `users` (
+      `id`         varchar(36)  NOT NULL,
+      `first_name` varchar(255) NOT NULL,
+      `last_name`  varchar(255) NOT NULL,
+      `age`        int          NOT NULL,
+      PRIMARY KEY (`id`)                    
+    ) ENGINE=InnoDB
+      DEFAULT CHARSET=utf8mb4;
 ```
 
 ```bash
