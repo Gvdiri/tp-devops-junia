@@ -60,6 +60,16 @@ L'API et MySQL sont déployés sur k3s. L'API est accessible uniquement depuis l
 kubectl apply -f k8S/
 ```
 
+```bash
+kubectl apply -f k8s/mysql-secret.yaml
+kubectl apply -f k8s/mysql-pvc.yaml
+kubectl apply -f k8s/mysql-deployment.yaml
+kubectl apply -f k8s/mysql-service.yaml
+kubectl apply -f k8s/api-deployment.yaml
+kubectl apply -f k8s/api-service.yaml
+kubectl apply -f k8s/api-hpa.yaml
+```
+
 ---
 
 ## Partie 4 — Pipeline CI/CD
