@@ -47,8 +47,7 @@ L'image est construite en multi-stage pour minimiser sa taille :
 - stage final : copie uniquement le nécessaire
 
 ```bash
-docker build -t robo2575/node-api:latest .
-docker push robo2575/node-api:latest
+docker pull robo2575/node-api:latest
 ```
 
 ---
