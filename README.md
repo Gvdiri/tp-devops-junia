@@ -48,8 +48,11 @@ L'image est construite en multi-stage pour minimiser sa taille :
 
 ```bash
 docker pull robo2575/node-api:latest
-```
 
+aaaaa
+
+```
+aaaaaa
 ---
 
 ## Partie 3 — Déploiement Kubernetes
